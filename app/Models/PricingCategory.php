@@ -6,5 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PricingCategory extends Model
 {
+    protected $guarded = [];
+
     //
 }
