@@ -22,7 +22,24 @@ class StoreProviderRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'name'                  => 'required|string|max:200',
+            'code'                  => 'required|string|max:100|unique:providers,code',
+            'provider_company'      => 'required|string|max:100',
+            'provider_company_code' => 'required|string|max:100',
+            'description'           => 'nullable|string',
+            'capabilities'          => 'nullable|array',
+            'billing_unit'          => 'nullable|string|max:50',
+            'billing_granularity'   => 'nullable|integer|min:1',
+            'allow_decimals'        => 'nullable|boolean',
+            'input_rate'            => 'nullable|numeric|min:0',
+            'output_rate'           => 'nullable|numeric|min:0',
+            'rate'                  => 'nullable|numeric|min:0',
+            'multipliers'           => 'nullable|array',
+            'logo_url'              => 'nullable|string|max:500',
+            'is_active'             => 'nullable|boolean',
+            'metadata'              => 'nullable|array',
+        ];
     }
-    }
+    
 }

@@ -22,7 +22,16 @@ class UpdatePlanRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'name'        => 'sometimes|required|string|max:100',
+            'code'        => 'sometimes|required|string|max:100|unique:plans,code,' . $this->route('plan'),
+            'price'       => 'sometimes|required|numeric|min:0',
+            'max_tasks'   => 'sometimes|nullable|integer|min:1',
+            'description' => 'sometimes|nullable|string',
+            'features'    => 'sometimes|nullable|array',
+            'is_active'   => 'sometimes|boolean',
+            'sort_order'  => 'sometimes|integer',
+        ];
     }
-    }
+    
 }

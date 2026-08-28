@@ -22,7 +22,13 @@ class StorePricingCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'name'        => 'required|string|max:100',
+            'code'        => 'required|string|max:100|unique:pricing_categories,code',
+            'description' => 'nullable|string',
+            'is_active'   => 'nullable|boolean',
+            'sort_order'  => 'nullable|integer',
+        ];
     }
-    }
+    
 }

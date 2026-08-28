@@ -8,5 +8,9 @@ class Plan extends Model
 {
     protected $guarded = [];
 
-    //
+    protected $casts = [
+        'features'  => 'array',
+        'price'     => 'float',
+        'is_active' => 'boolean',
+    ];
 }

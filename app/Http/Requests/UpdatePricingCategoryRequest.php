@@ -22,7 +22,13 @@ class UpdatePricingCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'name'        => 'sometimes|required|string|max:100',
+            'code'        => 'sometimes|required|string|max:100|unique:pricing_categories,code,' . $this->route('pricing_category'),
+            'description' => 'sometimes|nullable|string',
+            'is_active'   => 'sometimes|boolean',
+            'sort_order'  => 'sometimes|integer',
+        ];
     }
-    }
+    
 }

@@ -8,5 +8,7 @@ class PricingCategory extends Model
 {
     protected $guarded = [];
 
-    //
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }

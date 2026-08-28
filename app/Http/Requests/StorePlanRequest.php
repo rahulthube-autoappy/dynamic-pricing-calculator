@@ -22,7 +22,16 @@ class StorePlanRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'name'        => 'required|string|max:100',
+            'code'        => 'required|string|max:100|unique:plans,code',
+            'price'       => 'nullable|numeric|min:0',
+            'max_tasks'   => 'nullable|integer|min:1',
+            'description' => 'nullable|string',
+            'features'    => 'nullable|array',
+            'is_active'   => 'nullable|boolean',
+            'sort_order'  => 'nullable|integer',
+        ];
     }
-    }
+    
 }
