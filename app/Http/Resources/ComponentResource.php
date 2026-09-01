@@ -11,7 +11,6 @@ class ComponentResource extends JsonResource
     {
         return [
             'id'                    => $this->id,
-            'uuid'                  => $this->uuid,
             'parent_id'             => $this->parent_id,
             'name'                  => $this->name,
             'description'           => $this->description,
@@ -28,8 +27,10 @@ class ComponentResource extends JsonResource
             'pricing_method'        => $this->pricing_method,
             'billing_type'          => $this->billing_type,
             'unit'                  => $this->unit,
-            'unit_price'            => $this->unit_price,
+            'unit_price'            => $this->unit_price !== null ? (float) $this->unit_price : ($this->is_leaf ? null : $this->calculateEstimatedPrice()),
             'quantity'              => $this->quantity,
+            'estimated_price'       => $this->calculateEstimatedPrice(),
+            'starting_price'        => $this->calculateEstimatedPrice(),
             'expert_fee_mode'       => $this->expert_fee_mode,
             'automation_expert_fee' => $this->automation_expert_fee,
             'available_providers'   => $this->available_providers,

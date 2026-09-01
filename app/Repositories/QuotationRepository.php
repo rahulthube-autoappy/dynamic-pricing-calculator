@@ -3,21 +3,38 @@
 namespace App\Repositories;
 
 use App\Models\Quotation;
-use Illuminate\Support\Str;
+use App\Models\QuotationNode;
 
 class QuotationRepository
 {
     public function getByUser(int $userId)
     {
-        return Quotation::with(['plan', 'sourceComponent'])
+        return Quotation::with(['selectedPlan', 'sourceComponent'])
             ->where('user_id', $userId)
             ->orderByDesc('updated_at')
             ->get();
     }
 
-    public function getById(int $id): Quotation
+    public function getById(string $id): Quotation
     {
-        return Quotation::with(['plan', 'sourceComponent', 'rootNodes.allChildren.selectedProvider'])->findOrFail($id);
+        $quotation = Quotation::with(['selectedPlan', 'sourceComponent'])->findOrFail($id);
+        
+        $allNodes = QuotationNode::with('selectedProvider', 'pricingCategory')
+            ->where('quotation_id', $id)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($allNodes as $item) {
+            $children = $allNodes->filter(function ($c) use ($item) {
+                return $c->parent_node_id === $item->id;
+            })->values();
+            $item->setRelation('children', $children);
+        }
+
+        $rootNodes = $allNodes->whereNull('parent_node_id')->values();
+        $quotation->setRelation('rootNodes', $rootNodes);
+
+        return $quotation;
     }
 
     public function getActiveCartForUser(int $userId): ?Quotation
@@ -30,18 +47,17 @@ class QuotationRepository
 
     public function create(array $data): Quotation
     {
-        $data['uuid'] = $data['uuid'] ?? (string) Str::uuid();
         return Quotation::create($data);
     }
 
-    public function update(int $id, array $data): Quotation
+    public function update(string $id, array $data): Quotation
     {
         $record = Quotation::findOrFail($id);
         $record->update($data);
-        return $record->fresh(['plan', 'sourceComponent']);
+        return $record->fresh(['selectedPlan', 'sourceComponent']);
     }
 
-    public function delete(int $id): bool
+    public function delete(string $id): bool
     {
         $record = Quotation::findOrFail($id);
         $record->update(['status' => 'archived']);

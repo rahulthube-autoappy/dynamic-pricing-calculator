@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Order extends Model
 {
+    use HasUuids;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -26,16 +29,16 @@ class Order extends Model
 
     public function quotation()
     {
-        return $this->belongsTo(Quotation::class);
+        return $this->belongsTo(Quotation::class, 'quotation_id');
     }
 
     public function plan()
     {
-        return $this->belongsTo(Plan::class);
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 
     public function pricingSnapshots()
     {
-        return $this->hasMany(PricingSnapshot::class);
+        return $this->hasMany(PricingSnapshot::class, 'order_id');
     }
 }

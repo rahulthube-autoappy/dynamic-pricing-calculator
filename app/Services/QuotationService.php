@@ -8,7 +8,6 @@ use App\Repositories\QuotationRepository;
 use App\Repositories\QuotationNodeRepository;
 use App\Repositories\ComponentRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class QuotationService
 {
@@ -34,15 +33,11 @@ class QuotationService
         return $this->repo->getByUser($userId);
     }
 
-    public function getById(int $id): Quotation
+    public function getById(string $id): Quotation
     {
         return $this->repo->getById($id);
     }
 
-    /**
-     * Create a quotation. If source_component_id is given (copy a bundle),
-     * deep-copy the component tree into quotation_nodes.
-     */
     public function create(array $data): Quotation
     {
         return DB::transaction(function () use ($data) {
@@ -57,34 +52,37 @@ class QuotationService
         });
     }
 
-    public function update(int $id, array $data): Quotation
+    public function update(string $id, array $data): Quotation
     {
         return $this->repo->update($id, $data);
     }
 
-    public function delete(int $id): bool
+    public function delete(string $id): bool
     {
         return $this->repo->delete($id);
     }
 
-    /**
-     * Calculate pricing for a quotation using the QuotationNodePricingEngine.
-     */
-    public function calculatePricing(int $quotationId): array
+    public function calculatePricing(string $quotationId): array
     {
         $quotation = $this->repo->getById($quotationId);
-        $rootNodes = QuotationNode::with('allChildren.selectedProvider')
+        
+        $allNodes = QuotationNode::with('selectedProvider')
             ->where('quotation_id', $quotationId)
-            ->whereNull('parent_node_id')
             ->orderBy('sort_order')
             ->get();
 
+        foreach ($allNodes as $item) {
+            $children = $allNodes->filter(fn($c) => $c->parent_node_id === $item->id)->values();
+            $item->setRelation('children', $children);
+        }
+
+        $rootNodes = $allNodes->whereNull('parent_node_id')->values();
+
         $result = $this->pricingEngine->calculate($rootNodes->all());
 
-        // Attach plan fee if a plan is selected
         $planFee = 0.0;
-        if ($quotation->plan) {
-            $planFee = (float) $quotation->plan->price;
+        if ($quotation->selectedPlan) {
+            $planFee = (float) $quotation->selectedPlan->price;
         }
 
         $summary = $result['summary'];
@@ -108,13 +106,16 @@ class QuotationService
         ];
     }
 
-    /**
-     * Recursively copy a component tree into quotation_nodes.
-     */
-    protected function copyComponentTreeToNodes($component, int $quotationId, ?int $parentNodeId, int $depth): void
+    protected function copyComponentTreeToNodes($component, string $quotationId, ?string $parentNodeId, int $depth): void
     {
+        $defaultProviderId = null;
+        if ($component->available_providers && is_array($component->available_providers)) {
+            $defaultConfig = collect($component->available_providers)->firstWhere('is_default', true) 
+                ?? collect($component->available_providers)->first();
+            $defaultProviderId = $defaultConfig['provider_id'] ?? null;
+        }
+
         $node = QuotationNode::create([
-            'uuid'                  => (string) Str::uuid(),
             'quotation_id'          => $quotationId,
             'parent_node_id'        => $parentNodeId,
             'source_component_id'   => $component->id,
@@ -129,8 +130,9 @@ class QuotationService
             'unit'                  => $component->unit,
             'quantity'              => $component->quantity,
             'unit_price'            => $component->unit_price,
-            'expert_fee_mode'       => $depth === 0 ? $component->expert_fee_mode : null,
-            'automation_expert_fee' => $depth === 0 ? $component->automation_expert_fee : null,
+            'selected_provider_id'  => $defaultProviderId,
+            'expert_fee_mode'       => ($depth === 0 || $depth === 1) ? $component->expert_fee_mode : null,
+            'automation_expert_fee' => ($depth === 0 || $depth === 1) ? $component->automation_expert_fee : null,
             'sort_order'            => $component->sort_order,
         ]);
 

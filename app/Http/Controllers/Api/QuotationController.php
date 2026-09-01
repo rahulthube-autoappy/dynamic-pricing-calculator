@@ -21,22 +21,20 @@ class QuotationController extends Controller
     /** GET /api/quotations — list all quotations for the user */
     public function index(Request $request)
     {
-        // Temporarily use user_id=1 until auth middleware is wired up
         $userId = $request->input('user_id', 1);
-        return QuotationResource::collection($this->service->getByUser($userId));
+        return QuotationResource::collection($this->service->getByUser((int) $userId));
     }
 
     /** GET /api/quotations/{id} */
     public function show($id)
     {
-        return new QuotationResource($this->service->getById($id));
+        return new QuotationResource($this->service->getById((string) $id));
     }
 
     /** POST /api/quotations */
     public function store(StoreQuotationRequest $request)
     {
         $data = $request->validated();
-        // Temporarily default user_id=1 until auth middleware is wired up
         if (empty($data['user_id'])) {
             $data['user_id'] = 1;
         }
@@ -47,13 +45,13 @@ class QuotationController extends Controller
     /** PUT|PATCH /api/quotations/{id} */
     public function update(UpdateQuotationRequest $request, $id)
     {
-        return new QuotationResource($this->service->update($id, $request->validated()));
+        return new QuotationResource($this->service->update((string) $id, $request->validated()));
     }
 
     /** DELETE /api/quotations/{id} — archives the quotation */
     public function destroy($id)
     {
-        $this->service->delete($id);
+        $this->service->delete((string) $id);
         return response()->json(['message' => 'Quotation archived']);
     }
 
@@ -63,7 +61,7 @@ class QuotationController extends Controller
      */
     public function calculate($id)
     {
-        $pricing = $this->service->calculatePricing((int) $id);
+        $pricing = $this->service->calculatePricing((string) $id);
         return response()->json([
             'success' => true,
             'data'    => $pricing,

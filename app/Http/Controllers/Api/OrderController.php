@@ -23,8 +23,8 @@ class OrderController extends Controller
      */
     public function index(Request $request)
     {
-        $userId = $request->input('user_id', 1); // fallback to user_id=1 for dev
-        return OrderResource::collection($this->service->getByUser($userId));
+        $userId = $request->input('user_id', 1);
+        return OrderResource::collection($this->service->getByUser((int) $userId));
     }
 
     /**
@@ -32,7 +32,7 @@ class OrderController extends Controller
      */
     public function show($id)
     {
-        return new OrderResource($this->service->getById((int) $id));
+        return new OrderResource($this->service->getById((string) $id));
     }
 
     /**
@@ -41,11 +41,11 @@ class OrderController extends Controller
     public function checkout(CheckoutRequest $request)
     {
         $data = $request->validated();
-        $userId = $data['user_id'] ?? 1; // default user_id=1 for dev
+        $userId = $data['user_id'] ?? 1;
         
         try {
             $order = $this->service->checkout(
-                (int) $data['quotation_id'],
+                (string) $data['quotation_id'],
                 (int) $userId,
                 $data['idempotency_key']
             );
@@ -64,7 +64,7 @@ class OrderController extends Controller
     public function cancel($id)
     {
         try {
-            $order = $this->service->cancel((int) $id);
+            $order = $this->service->cancel((string) $id);
             return new OrderResource($order);
         } catch (\RuntimeException $e) {
             return response()->json([
@@ -80,7 +80,7 @@ class OrderController extends Controller
     public function confirm($id)
     {
         try {
-            $order = $this->service->confirm((int) $id);
+            $order = $this->service->confirm((string) $id);
             return new OrderResource($order);
         } catch (\RuntimeException $e) {
             return response()->json([

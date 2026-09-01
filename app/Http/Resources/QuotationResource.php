@@ -11,7 +11,6 @@ class QuotationResource extends JsonResource
     {
         return [
             'id'                  => $this->id,
-            'uuid'                => $this->uuid,
             'user_id'             => $this->user_id,
             'type'                => $this->type,
             'title'               => $this->title,
@@ -20,11 +19,11 @@ class QuotationResource extends JsonResource
             'expert_notes'        => $this->expert_notes,
             'notes'               => $this->notes,
             'idempotency_key'     => $this->idempotency_key,
-            'selected_plan'       => $this->whenLoaded('plan', fn() => $this->plan ? [
-                'id'    => $this->plan->id,
-                'name'  => $this->plan->name,
-                'code'  => $this->plan->code,
-                'price' => $this->plan->price,
+            'selected_plan'       => $this->whenLoaded('selectedPlan', fn() => $this->selectedPlan ? [
+                'id'    => $this->selectedPlan->id,
+                'name'  => $this->selectedPlan->name,
+                'code'  => $this->selectedPlan->code,
+                'price' => $this->selectedPlan->price,
             ] : null),
             'source_component'    => $this->whenLoaded('sourceComponent', fn() => $this->sourceComponent ? [
                 'id'   => $this->sourceComponent->id,

@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Contracts\Validation\ValidationRule;
 
 class StoreComponentRequest extends FormRequest
 {
@@ -13,13 +12,14 @@ class StoreComponentRequest extends FormRequest
     {
         return [
             'name'                  => 'required|string|max:200',
-            'parent_id'             => 'nullable|integer|exists:components,id',
+            'parent_id'             => 'nullable|array',
+            'parent_id.*'           => 'string|exists:components,id',
             'description'           => 'nullable|string',
             'is_bundle'             => 'nullable|boolean',
             'is_leaf'               => 'nullable|boolean',
             'platform'              => 'nullable|string|max:100',
             'category'              => 'nullable|string|max:100',
-            'pricing_category_id'   => 'nullable|integer|exists:pricing_categories,id',
+            'pricing_category_id'   => 'nullable|string|exists:pricing_categories,id',
             'pricing_method'        => 'nullable|in:fixed,qty_unit,percentage,formula,usage_estimation,manual',
             'billing_type'          => 'nullable|in:ONE_TIME,RECURRING',
             'unit'                  => 'nullable|string|max:50',
@@ -30,7 +30,7 @@ class StoreComponentRequest extends FormRequest
             'expert_fee_mode'       => 'nullable|in:COMPONENT_LEVEL,AUTOMATION_LEVEL',
             'automation_expert_fee' => 'nullable|numeric|min:0',
             'available_providers'   => 'nullable|array',
-            'available_providers.*.provider_id' => 'required_with:available_providers|integer|exists:providers,id',
+            'available_providers.*.provider_id' => 'required_with:available_providers|string|exists:providers,id',
             'available_providers.*.is_default'  => 'nullable|boolean',
             'notes'                 => 'nullable|string',
             'tags'                  => 'nullable|array',

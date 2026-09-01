@@ -11,7 +11,6 @@ class QuotationNodeResource extends JsonResource
     {
         return [
             'id'                    => $this->id,
-            'uuid'                  => $this->uuid,
             'quotation_id'          => $this->quotation_id,
             'parent_node_id'        => $this->parent_node_id,
             'source_component_id'   => $this->source_component_id,

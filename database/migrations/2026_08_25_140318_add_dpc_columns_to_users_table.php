@@ -6,16 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     * Adds 4 DPC-specific columns to the existing AutoAppy users table.
-     * tasks_used_this_month tracks AutoAppy workflow runs (checked against plans.max_tasks).
-     * Third-party resource consumption is governed by providers, not tracked here.
-     */
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('current_plan_id')
+            $table->foreignUuid('current_plan_id')
                   ->nullable()
                   ->after('remember_token')
                   ->constrained('plans')
@@ -35,9 +29,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {

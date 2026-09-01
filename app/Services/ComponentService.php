@@ -27,7 +27,7 @@ class ComponentService
         return $this->repo->getBundles();
     }
 
-    public function getById($id): Component
+    public function getById(string $id): Component
     {
         return $this->repo->getById($id);
     }
@@ -37,20 +37,17 @@ class ComponentService
         return $this->repo->create($data);
     }
 
-    public function update($id, array $data): Component
+    public function update(string $id, array $data): Component
     {
         return $this->repo->update($id, $data);
     }
 
-    public function delete($id): bool
+    public function delete(string $id): bool
     {
         return $this->repo->delete($id);
     }
 
-    /**
-     * Get a bundle with its full nested tree and expanded provider info.
-     */
-    public function getBundleTree(int $id): array
+    public function getBundleTree(string $id): array
     {
         $bundle = $this->repo->getBundleWithChildren($id);
         $allProviders = $this->providerRepo->getAllActiveKeyedById();
@@ -91,7 +88,6 @@ class ComponentService
 
         return [
             'id'                    => $node->id,
-            'uuid'                  => $node->uuid,
             'parent_id'             => $node->parent_id,
             'name'                  => $node->name,
             'description'           => $node->description,
@@ -108,7 +104,7 @@ class ComponentService
             'automation_expert_fee' => $node->automation_expert_fee,
             'sort_order'            => $node->sort_order,
             'is_active'             => $node->is_active,
-            'available_providers'   => $expandedProviders ?: null,
+            'providers'             => $expandedProviders,
             'children'              => $children,
         ];
     }

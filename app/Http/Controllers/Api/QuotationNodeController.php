@@ -20,34 +20,34 @@ class QuotationNodeController extends Controller
     /** GET /api/quotations/{quotationId}/nodes */
     public function index($quotationId)
     {
-        $nodes = $this->service->getRootNodes((int) $quotationId);
+        $nodes = $this->service->getRootNodes((string) $quotationId);
         return QuotationNodeResource::collection($nodes);
     }
 
     /** POST /api/quotations/{quotationId}/nodes */
     public function store(StoreQuotationNodeRequest $request, $quotationId)
     {
-        $node = $this->service->create((int) $quotationId, $request->validated());
+        $node = $this->service->create((string) $quotationId, $request->validated());
         return (new QuotationNodeResource($node))->response()->setStatusCode(201);
     }
 
     /** PUT|PATCH /api/quotations/{quotationId}/nodes/{nodeId} */
     public function update(UpdateQuotationNodeRequest $request, $quotationId, $nodeId)
     {
-        return new QuotationNodeResource($this->service->update((int) $nodeId, $request->validated()));
+        return new QuotationNodeResource($this->service->update((string) $nodeId, $request->validated()));
     }
 
     /** DELETE /api/quotations/{quotationId}/nodes/{nodeId} */
     public function destroy($quotationId, $nodeId)
     {
-        $this->service->delete((int) $nodeId);
+        $this->service->delete((string) $nodeId);
         return response()->json(['message' => 'Node deleted']);
     }
 
     /** PATCH /api/quotations/{quotationId}/nodes/{nodeId}/toggle */
     public function toggleSelection($quotationId, $nodeId)
     {
-        $node = $this->service->toggleSelection((int) $nodeId);
+        $node = $this->service->toggleSelection((string) $nodeId);
         return new QuotationNodeResource($node);
     }
 }

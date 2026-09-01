@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\Order;
-use Illuminate\Support\Str;
 
 class OrderRepository
 {
@@ -15,7 +14,7 @@ class OrderRepository
             ->get();
     }
 
-    public function getById(int $id): Order
+    public function getById(string $id): Order
     {
         return Order::with([
             'plan',
@@ -31,11 +30,10 @@ class OrderRepository
 
     public function create(array $data): Order
     {
-        $data['uuid'] = $data['uuid'] ?? (string) Str::uuid();
         return Order::create($data);
     }
 
-    public function updateStatus(int $id, string $status): Order
+    public function updateStatus(string $id, string $status): Order
     {
         $order = Order::findOrFail($id);
         $order->update(['status' => $status]);

@@ -14,33 +14,33 @@ class QuotationNodeService
         $this->repo = $repo;
     }
 
-    public function getRootNodes(int $quotationId)
+    public function getRootNodes(string $quotationId)
     {
         return $this->repo->getRootNodes($quotationId);
     }
 
-    public function getById(int $id): QuotationNode
+    public function getById(string $id): QuotationNode
     {
         return $this->repo->getById($id);
     }
 
-    public function create(int $quotationId, array $data): QuotationNode
+    public function create(string $quotationId, array $data): QuotationNode
     {
         $data['quotation_id'] = $quotationId;
         return $this->repo->create($data);
     }
 
-    public function update(int $id, array $data): QuotationNode
+    public function update(string $id, array $data): QuotationNode
     {
         return $this->repo->update($id, $data);
     }
 
-    public function delete(int $id): bool
+    public function delete(string $id): bool
     {
         return $this->repo->delete($id);
     }
 
-    public function toggleSelection(int $id): QuotationNode
+    public function toggleSelection(string $id): QuotationNode
     {
         return $this->repo->toggleSelection($id);
     }

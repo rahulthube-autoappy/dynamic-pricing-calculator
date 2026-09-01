@@ -3,54 +3,68 @@
 namespace App\Repositories;
 
 use App\Models\Component;
-use Illuminate\Support\Str;
 
 class ComponentRepository
 {
     public function getAll()
     {
-        return Component::with('pricingCategory')->orderBy('sort_order')->get();
+        $all = Component::with('pricingCategory')->orderBy('sort_order')->get();
+        $this->linkChildren($all);
+        return $all;
     }
 
     public function getBundles()
     {
-        return Component::with('allChildren')
-            ->where('is_bundle', true)
+        $all = Component::with('pricingCategory')
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get();
+        $this->linkChildren($all);
+        return $all->where('is_bundle', true)->values();
     }
 
-    public function getById($id)
+    public function getById(string $id): Component
     {
-        return Component::with('allChildren', 'pricingCategory')->findOrFail($id);
+        $all = Component::with('pricingCategory')->orderBy('sort_order')->get();
+        $this->linkChildren($all);
+        return $all->firstWhere('id', $id) ?? Component::findOrFail($id);
     }
 
-    public function getBundleWithChildren($id)
+    public function getBundleWithChildren(string $id): Component
     {
-        return Component::with(['children' => function ($query) {
-            $query->with(['children' => function ($q) {
-                $q->with('children');
-            }]);
-        }])->where('is_bundle', true)->findOrFail($id);
+        $all = Component::with('pricingCategory')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+        $this->linkChildren($all);
+        return $all->firstWhere('id', $id) ?? Component::findOrFail($id);
     }
 
     public function create(array $data): Component
     {
-        $data['uuid'] = $data['uuid'] ?? (string) Str::uuid();
         return Component::create($data);
     }
 
-    public function update($id, array $data): Component
+    public function update(string $id, array $data): Component
     {
-        $record = $this->getById($id);
+        $record = Component::findOrFail($id);
         $record->update($data);
-        return $record->fresh(['allChildren', 'pricingCategory']);
+        return $this->getById($id);
     }
 
-    public function delete($id): bool
+    public function delete(string $id): bool
     {
-        $record = $this->getById($id);
+        $record = Component::findOrFail($id);
         return $record->delete();
+    }
+
+    protected function linkChildren($collection)
+    {
+        foreach ($collection as $item) {
+            $children = $collection->filter(function ($c) use ($item) {
+                return is_array($c->parent_id) && in_array((string) $item->id, array_map('strval', $c->parent_id));
+            })->values();
+            $item->setRelation('children', $children);
+        }
     }
 }

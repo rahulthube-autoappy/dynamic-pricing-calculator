@@ -9,7 +9,6 @@ use App\Repositories\OrderRepository;
 use App\Repositories\PricingSnapshotRepository;
 use App\Repositories\QuotationRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class OrderService
 {
@@ -35,61 +34,49 @@ class OrderService
         return $this->orderRepo->getByUser($userId);
     }
 
-    public function getById(int $id): Order
+    public function getById(string $id): Order
     {
         return $this->orderRepo->getById($id);
     }
 
-    /**
-     * Checkout: create an Order from a Quotation.
-     *
-     * Steps:
-     *  1. Idempotency check — return existing order if key already used.
-     *  2. Validate quotation belongs to user and has a plan selected.
-     *  3. Re-calculate all pricing server-side (never trust frontend).
-     *  4. Create the Order row with locked amounts.
-     *  5. Write immutable PricingSnapshot rows for every billable node.
-     *  6. Mark quotation as checked_out.
-     */
-    public function checkout(int $quotationId, int $userId, string $idempotencyKey): Order
+    public function checkout(string $quotationId, int $userId, string $idempotencyKey): Order
     {
-        // 1. Idempotency guard
         $existing = $this->orderRepo->findByIdempotencyKey($idempotencyKey);
         if ($existing) {
             return $existing;
         }
 
         return DB::transaction(function () use ($quotationId, $userId, $idempotencyKey) {
-            // 2. Load + validate quotation
-            $quotation = Quotation::with([
-                'plan',
-                'rootNodes.allChildren.selectedProvider',
-            ])->findOrFail($quotationId);
+            $quotation = Quotation::with('selectedPlan')->findOrFail($quotationId);
 
-            if (!$quotation->plan) {
+            if (!$quotation->selectedPlan) {
                 throw new \RuntimeException('A plan must be selected before checkout.');
             }
             if ($quotation->status === 'checked_out') {
                 throw new \RuntimeException('This quotation has already been checked out.');
             }
 
-            // 3. Server-side pricing recalculation
-            $rootNodes = QuotationNode::with('allChildren.selectedProvider')
+            $allNodes = QuotationNode::with('selectedProvider', 'pricingCategory')
                 ->where('quotation_id', $quotationId)
-                ->whereNull('parent_node_id')
                 ->orderBy('sort_order')
                 ->get();
 
+            foreach ($allNodes as $item) {
+                $children = $allNodes->filter(fn($c) => $c->parent_node_id === $item->id)->values();
+                $item->setRelation('children', $children);
+            }
+
+            $rootNodes = $allNodes->whereNull('parent_node_id')->values();
+
             $priceResult = $this->pricingEngine->calculate($rootNodes->all());
             $summary     = $priceResult['summary'];
-            $plan        = $quotation->plan;
+            $plan        = $quotation->selectedPlan;
             $planPrice   = (float) $plan->price;
             $taxRate     = 0.18;
             $taxableAmt  = $summary['subtotal'] + $planPrice;
             $taxTotal    = round($taxableAmt * $taxRate, 2);
             $grandTotal  = round($taxableAmt + $taxTotal, 2);
 
-            // 4. Create the locked Order row
             $order = $this->orderRepo->create([
                 'user_id'                  => $userId,
                 'quotation_id'             => $quotation->id,
@@ -107,20 +94,15 @@ class OrderService
                 'grand_total'              => $grandTotal,
             ]);
 
-            // 5. Write immutable pricing snapshots
             $this->writeSnapshots($order->id, $priceResult['breakdown'], null);
 
-            // 6. Lock the quotation
             $quotation->update(['status' => 'checked_out']);
 
             return $this->orderRepo->getById($order->id);
         });
     }
 
-    /**
-     * Cancel a pending order.
-     */
-    public function cancel(int $id): Order
+    public function cancel(string $id): Order
     {
         $order = Order::findOrFail($id);
         if ($order->status !== 'pending') {
@@ -129,10 +111,7 @@ class OrderService
         return $this->orderRepo->updateStatus($id, 'cancelled');
     }
 
-    /**
-     * Confirm an order (admin action).
-     */
-    public function confirm(int $id): Order
+    public function confirm(string $id): Order
     {
         $order = Order::findOrFail($id);
         if ($order->status !== 'pending') {
@@ -141,13 +120,7 @@ class OrderService
         return $this->orderRepo->updateStatus($id, 'confirmed');
     }
 
-    // ── Snapshot writing ─────────────────────────────────────────────────────
-
-    /**
-     * Recursively write pricing_snapshots from the pricing engine breakdown.
-     * The breakdown is already the output of QuotationNodePricingEngine::calculate().
-     */
-    protected function writeSnapshots(int $orderId, array $nodes, ?int $parentSnapshotId): void
+    protected function writeSnapshots(string $orderId, array $nodes, ?string $parentSnapshotId): void
     {
         foreach ($nodes as $node) {
             $snapshotId = $this->insertSnapshot($orderId, $node, $parentSnapshotId);
@@ -157,7 +130,7 @@ class OrderService
         }
     }
 
-    protected function insertSnapshot(int $orderId, array $node, ?int $parentSnapshotId): int
+    protected function insertSnapshot(string $orderId, array $node, ?string $parentSnapshotId): string
     {
         $row = [
             'order_id'            => $orderId,
@@ -165,7 +138,7 @@ class OrderService
             'parent_snapshot_id'  => $parentSnapshotId,
             'depth'               => $node['depth'],
             'node_name'           => $node['name'],
-            'pricing_category'    => null, // plain string copy — filled below if available
+            'pricing_category'    => null,
             'pricing_method'      => $node['pricing_method'] ?? null,
             'billing_type'        => $node['billing_type'] ?? null,
             'unit'                => $node['unit'] ?? null,

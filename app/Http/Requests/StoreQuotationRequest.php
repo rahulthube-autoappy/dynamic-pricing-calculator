@@ -13,8 +13,8 @@ class StoreQuotationRequest extends FormRequest
         return [
             'type'                => 'required|in:cart,custom_automation',
             'title'               => 'nullable|string|max:200',
-            'source_component_id' => 'nullable|integer|exists:components,id',
-            'selected_plan_id'    => 'nullable|integer|exists:plans,id',
+            'source_component_id' => 'nullable|string|exists:components,id',
+            'selected_plan_id'    => 'nullable|string|exists:plans,id',
             'requires_expert'     => 'nullable|boolean',
             'expert_notes'        => 'nullable|string',
             'notes'               => 'nullable|string',

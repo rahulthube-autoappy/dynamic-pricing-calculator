@@ -3,47 +3,67 @@
 namespace App\Repositories;
 
 use App\Models\QuotationNode;
-use Illuminate\Support\Str;
 
 class QuotationNodeRepository
 {
-    public function getRootNodes(int $quotationId)
+    public function getRootNodes(string $quotationId)
     {
-        return QuotationNode::with('allChildren.selectedProvider')
+        $all = QuotationNode::with('selectedProvider', 'pricingCategory')
             ->where('quotation_id', $quotationId)
-            ->whereNull('parent_node_id')
             ->orderBy('sort_order')
             ->get();
+
+        $this->linkChildren($all);
+
+        return $all->whereNull('parent_node_id')->values();
     }
 
-    public function getById(int $id): QuotationNode
+    public function getById(string $id): QuotationNode
     {
-        return QuotationNode::with('allChildren', 'selectedProvider', 'pricingCategory')->findOrFail($id);
+        $node = QuotationNode::findOrFail($id);
+        
+        $all = QuotationNode::with('selectedProvider', 'pricingCategory')
+            ->where('quotation_id', $node->quotation_id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $this->linkChildren($all);
+
+        return $all->firstWhere('id', $id) ?? $node;
     }
 
     public function create(array $data): QuotationNode
     {
-        $data['uuid'] = $data['uuid'] ?? (string) Str::uuid();
         return QuotationNode::create($data);
     }
 
-    public function update(int $id, array $data): QuotationNode
+    public function update(string $id, array $data): QuotationNode
     {
         $record = QuotationNode::findOrFail($id);
         $record->update($data);
-        return $record->fresh(['allChildren', 'selectedProvider', 'pricingCategory']);
+        return $this->getById($id);
     }
 
-    public function delete(int $id): bool
+    public function delete(string $id): bool
     {
         $record = QuotationNode::findOrFail($id);
-        return $record->delete(); // cascades to children via DB FK
+        return $record->delete();
     }
 
-    public function toggleSelection(int $id): QuotationNode
+    public function toggleSelection(string $id): QuotationNode
     {
         $record = QuotationNode::findOrFail($id);
         $record->update(['is_selected' => !$record->is_selected]);
         return $record->fresh();
+    }
+
+    protected function linkChildren($collection)
+    {
+        foreach ($collection as $item) {
+            $children = $collection->filter(function ($c) use ($item) {
+                return $c->parent_node_id === $item->id;
+            })->values();
+            $item->setRelation('children', $children);
+        }
     }
 }

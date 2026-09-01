@@ -11,11 +11,8 @@ class CheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // The quotation being checked out
-            'quotation_id'     => 'required|integer|exists:quotations,id',
-            // user_id — will be from auth() in production; accepted here for dev
+            'quotation_id'     => 'required|string|exists:quotations,id',
             'user_id'          => 'nullable|integer|exists:users,id',
-            // Idempotency key supplied by client to prevent double-submit
             'idempotency_key'  => 'required|string|max:100',
         ];
     }

@@ -3,19 +3,7 @@
 namespace App\Services;
 
 use App\Models\QuotationNode;
-use Illuminate\Support\Collection;
 
-/**
- * Computes pricing from a quotation_nodes tree.
- * Reads only is_selected, billing_type, unit_price, quantity,
- * selected_provider (with its rate/multipliers), and selected_dimensions.
- *
- * Rules enforced:
- *  - Skip is_selected = false nodes and all their descendants.
- *  - Only leaf nodes (no children in this quotation tree) are billable.
- *  - expert_fee_mode on root node determines how expert fee is charged.
- *  - Never double-charge expert fees.
- */
 class QuotationNodePricingEngine
 {
     public function calculate(array $rootNodes): array
@@ -49,7 +37,6 @@ class QuotationNodePricingEngine
 
         $nodeArray = [
             'id'             => $node->id,
-            'uuid'           => $node->uuid,
             'name'           => $node->name,
             'depth'          => $node->depth,
             'billing_type'   => $node->billing_type,
@@ -62,11 +49,10 @@ class QuotationNodePricingEngine
             'children'       => [],
         ];
 
-        $children = $node->children->filter(fn($c) => true); // already loaded via allChildren
+        $children = $node->children ? $node->children->filter(fn($c) => true) : collect();
         $hasChildren = $children->count() > 0;
 
         if (!$hasChildren) {
-            // This is a billable leaf node
             $price = $this->computeLeafPrice($node);
             $nodeArray['calculated_price'] = round($price, 2);
             $nodeArray['provider'] = $this->providerSummary($node);
@@ -77,7 +63,6 @@ class QuotationNodePricingEngine
                 $summary['recurring_monthly_total'] += $price;
             }
         } else {
-            // Non-leaf: recurse into children, sum up
             $childTotal = 0.0;
             $formattedChildren = [];
             foreach ($children as $child) {
@@ -89,15 +74,19 @@ class QuotationNodePricingEngine
             $nodeArray['children'] = $formattedChildren;
         }
 
-        // Expert fee on root (depth=0) nodes
-        if ($node->depth === 0 && $node->expert_fee_mode) {
+        if ($node->expert_fee_mode && $node->automation_expert_fee > 0) {
             $expertFee = 0.0;
-            if ($node->expert_fee_mode === 'AUTOMATION_LEVEL') {
-                $expertFee = (float) ($node->automation_expert_fee ?? 0);
+            if ($node->depth === 0 && $node->expert_fee_mode === 'AUTOMATION_LEVEL') {
+                $expertFee = (float) $node->automation_expert_fee;
+            } elseif ($node->depth === 1 && $node->expert_fee_mode === 'COMPONENT_LEVEL') {
+                $expertFee = (float) $node->automation_expert_fee;
             }
-            // COMPONENT_LEVEL expert fees are baked into leaf nodes individually
-            $summary['expert_fee_total'] += $expertFee;
-            $nodeArray['expert_fee'] = round($expertFee, 2);
+
+            if ($expertFee > 0) {
+                $summary['expert_fee_total'] += $expertFee;
+                $nodeArray['expert_fee'] = round($expertFee, 2);
+                $nodeArray['calculated_price'] = round(($nodeArray['calculated_price'] ?? 0) + $expertFee, 2);
+            }
         }
 
         return $nodeArray;
@@ -108,21 +97,17 @@ class QuotationNodePricingEngine
         $quantity = (float) ($node->quantity ?? 1);
         $unitPrice = null;
 
-        // 1. Manual override: unit_price on the node itself
         if ($node->unit_price !== null) {
             $unitPrice = (float) $node->unit_price;
         }
 
-        // 2. Provider-derived price (if provider selected and no manual override)
         if ($unitPrice === null && $node->selectedProvider) {
             $provider = $node->selectedProvider;
             if ($provider->rate !== null) {
                 $unitPrice = (float) $provider->rate;
             } elseif ($provider->input_rate !== null) {
-                // For token-based: average of input+output as a composite unit price
                 $unitPrice = (((float)$provider->input_rate) + ((float)($provider->output_rate ?? 0))) / 2;
             }
-            // Apply dimension multipliers
             $unitPrice = $unitPrice ? $unitPrice * $this->getDimensionMultiplier($provider, $node->selected_dimensions) : 0;
         }
 
@@ -167,7 +152,6 @@ class QuotationNodePricingEngine
     {
         return [
             'id'               => $node->id,
-            'uuid'             => $node->uuid,
             'name'             => $node->name,
             'depth'            => $node->depth,
             'is_selected'      => false,
