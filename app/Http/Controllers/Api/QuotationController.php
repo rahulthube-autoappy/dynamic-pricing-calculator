@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateQuotationRequest;
 use App\Http\Resources\QuotationResource;
 use App\Services\QuotationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class QuotationController extends Controller
 {
@@ -22,12 +23,14 @@ class QuotationController extends Controller
     public function index(Request $request)
     {
         $userId = $request->input('user_id', 1);
+        Log::info("Quotation: Listing quotations for user", ['user_id' => $userId]);
         return QuotationResource::collection($this->service->getByUser((int) $userId));
     }
 
     /** GET /api/quotations/{id} */
     public function show($id)
     {
+        Log::info("Quotation: Fetching quotation details", ['quotation_id' => $id]);
         return new QuotationResource($this->service->getById((string) $id));
     }
 
@@ -38,19 +41,30 @@ class QuotationController extends Controller
         if (empty($data['user_id'])) {
             $data['user_id'] = 1;
         }
+        Log::info("Quotation: Creating new quotation", [
+            'type'                => $data['type'] ?? 'cart',
+            'source_component_id' => $data['source_component_id'] ?? null,
+            'user_id'             => $data['user_id'],
+        ]);
         $quotation = $this->service->create($data);
+        Log::info("Quotation: Created quotation successfully", ['quotation_id' => $quotation->id]);
         return (new QuotationResource($quotation))->response()->setStatusCode(201);
     }
 
     /** PUT|PATCH /api/quotations/{id} */
     public function update(UpdateQuotationRequest $request, $id)
     {
+        Log::info("Quotation: Updating quotation", [
+            'quotation_id' => $id,
+            'fields'       => array_keys($request->validated()),
+        ]);
         return new QuotationResource($this->service->update((string) $id, $request->validated()));
     }
 
     /** DELETE /api/quotations/{id} — archives the quotation */
     public function destroy($id)
     {
+        Log::info("Quotation: Archiving quotation", ['quotation_id' => $id]);
         $this->service->delete((string) $id);
         return response()->json(['message' => 'Quotation archived']);
     }
@@ -61,7 +75,13 @@ class QuotationController extends Controller
      */
     public function calculate($id)
     {
+        Log::info("Quotation: Calculating dynamic pricing", ['quotation_id' => $id]);
         $pricing = $this->service->calculatePricing((string) $id);
+        Log::info("Quotation: Calculation complete", [
+            'quotation_id' => $id,
+            'subtotal'     => $pricing['subtotal'] ?? null,
+            'grand_total'  => $pricing['grand_total'] ?? null,
+        ]);
         return response()->json([
             'success' => true,
             'data'    => $pricing,

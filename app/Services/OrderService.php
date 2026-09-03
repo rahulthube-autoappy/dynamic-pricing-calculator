@@ -43,6 +43,10 @@ class OrderService
     {
         $existing = $this->orderRepo->findByIdempotencyKey($idempotencyKey);
         if ($existing) {
+            \Illuminate\Support\Facades\Log::info("OrderService: Idempotency key hit, returning existing order", [
+                'idempotency_key' => $idempotencyKey,
+                'order_id'        => $existing->id,
+            ]);
             return $existing;
         }
 
@@ -82,7 +86,7 @@ class OrderService
                 'quotation_id'             => $quotation->id,
                 'plan_id'                  => $plan->id,
                 'idempotency_key'          => $idempotencyKey,
-                'status'                   => 'pending',
+                'status'                   => 'confirmed',
                 'currency'                 => 'INR',
                 'subtotal'                 => round($summary['subtotal'], 2),
                 'expert_fee_total'         => round($summary['expert_fee_total'], 2),

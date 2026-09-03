@@ -7,6 +7,7 @@ use App\Http\Requests\StoreQuotationNodeRequest;
 use App\Http\Requests\UpdateQuotationNodeRequest;
 use App\Http\Resources\QuotationNodeResource;
 use App\Services\QuotationNodeService;
+use Illuminate\Support\Facades\Log;
 
 class QuotationNodeController extends Controller
 {
@@ -20,6 +21,7 @@ class QuotationNodeController extends Controller
     /** GET /api/quotations/{quotationId}/nodes */
     public function index($quotationId)
     {
+        Log::info("QuotationNode: Fetching nodes tree", ['quotation_id' => $quotationId]);
         $nodes = $this->service->getRootNodes((string) $quotationId);
         return QuotationNodeResource::collection($nodes);
     }
@@ -27,19 +29,35 @@ class QuotationNodeController extends Controller
     /** POST /api/quotations/{quotationId}/nodes */
     public function store(StoreQuotationNodeRequest $request, $quotationId)
     {
-        $node = $this->service->create((string) $quotationId, $request->validated());
+        $validated = $request->validated();
+        Log::info("QuotationNode: Adding custom node", [
+            'quotation_id'   => $quotationId,
+            'name'           => $validated['name'] ?? null,
+            'parent_node_id' => $validated['parent_node_id'] ?? null,
+        ]);
+        $node = $this->service->create((string) $quotationId, $validated);
         return (new QuotationNodeResource($node))->response()->setStatusCode(201);
     }
 
     /** PUT|PATCH /api/quotations/{quotationId}/nodes/{nodeId} */
     public function update(UpdateQuotationNodeRequest $request, $quotationId, $nodeId)
     {
-        return new QuotationNodeResource($this->service->update((string) $nodeId, $request->validated()));
+        $validated = $request->validated();
+        Log::info("QuotationNode: Updating node", [
+            'quotation_id' => $quotationId,
+            'node_id'      => $nodeId,
+            'fields'       => array_keys($validated),
+        ]);
+        return new QuotationNodeResource($this->service->update((string) $nodeId, $validated));
     }
 
     /** DELETE /api/quotations/{quotationId}/nodes/{nodeId} */
     public function destroy($quotationId, $nodeId)
     {
+        Log::info("QuotationNode: Deleting node", [
+            'quotation_id' => $quotationId,
+            'node_id'      => $nodeId,
+        ]);
         $this->service->delete((string) $nodeId);
         return response()->json(['message' => 'Node deleted']);
     }
@@ -47,6 +65,10 @@ class QuotationNodeController extends Controller
     /** PATCH /api/quotations/{quotationId}/nodes/{nodeId}/toggle */
     public function toggleSelection($quotationId, $nodeId)
     {
+        Log::info("QuotationNode: Toggling node selection", [
+            'quotation_id' => $quotationId,
+            'node_id'      => $nodeId,
+        ]);
         $node = $this->service->toggleSelection((string) $nodeId);
         return new QuotationNodeResource($node);
     }
