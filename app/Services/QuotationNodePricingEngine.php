@@ -103,12 +103,7 @@ class QuotationNodePricingEngine
 
         if ($unitPrice === null && $node->selectedProvider) {
             $provider = $node->selectedProvider;
-            if ($provider->rate !== null) {
-                $unitPrice = (float) $provider->rate;
-            } elseif ($provider->input_rate !== null) {
-                $unitPrice = (((float)$provider->input_rate) + ((float)($provider->output_rate ?? 0))) / 2;
-            }
-            $unitPrice = $unitPrice ? $unitPrice * $this->getDimensionMultiplier($provider, $node->selected_dimensions) : 0;
+            $unitPrice = $provider->effective_rate * $this->getDimensionMultiplier($provider, $node->selected_dimensions);
         }
 
         if ($unitPrice === null) {

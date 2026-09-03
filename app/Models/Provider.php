@@ -22,4 +22,16 @@ class Provider extends Model
         'is_active'           => 'boolean',
         'metadata'            => 'array',
     ];
+
+    /**
+     * Get the single effective unit rate (flat rate or blended average of input/output rates).
+     */
+    public function getEffectiveRateAttribute(): float
+    {
+        if ($this->rate !== null) {
+            return (float) $this->rate;
+        }
+
+        return (((float) ($this->input_rate ?? 0)) + ((float) ($this->output_rate ?? 0))) / 2;
+    }
 }

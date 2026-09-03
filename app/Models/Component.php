@@ -58,9 +58,7 @@ class Component extends Model
                 $providerId = $defaultConfig['provider_id'] ?? null;
                 $provider = $providerId ? $providers->get($providerId) : null;
                 if ($provider) {
-                    $rate = $provider->rate !== null 
-                        ? (float) $provider->rate 
-                        : (((float) $provider->input_rate + (float) ($provider->output_rate ?? 0)) / 2);
+                    $rate = $provider->effective_rate;
                     $granularity = max(1, (int) ($provider->billing_granularity ?? 1));
                     return round(($qty / $granularity) * $rate, 2);
                 }

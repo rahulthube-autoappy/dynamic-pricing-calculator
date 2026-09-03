@@ -4,8 +4,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\CatalogController;
-use App\Http\Controllers\Api\PricingController;
-use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\ComponentController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\PricingCategoryController;
@@ -14,10 +12,8 @@ use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\QuotationNodeController;
 use App\Http\Controllers\Api\OrderController;
 
-// ── Catalog & Pricing ────────────────────────────────────────────────────────
+// ── Catalog ──────────────────────────────────────────────────────────────────
 Route::get('/catalog', [CatalogController::class, 'index']);
-Route::post('/pricing/calculate', [PricingController::class, 'calculate']);
-Route::post('/cart/snapshot', [CartController::class, 'snapshot']);
 
 // ── Master Library: Plans, PricingCategories, Providers ─────────────────────
 Route::apiResource('plans', PlanController::class);
