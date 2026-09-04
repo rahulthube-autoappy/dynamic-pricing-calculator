@@ -22,7 +22,11 @@ Route::apiResource('providers', ProviderController::class);
 
 // ── Components (master library) ──────────────────────────────────────────────
 Route::get('/components/bundles', [ComponentController::class, 'bundles']);
-Route::get('/components/bundle/{id}/estimate', [ComponentController::class, 'getBundleEstimate']);
+Route::get('/components/groups', [ComponentController::class, 'groups']);
+Route::get('/components/subcomponents', [ComponentController::class, 'subcomponents']);
+Route::get('/components/leaves', [ComponentController::class, 'leaves']);
+Route::get('/components/bundle/{id}/estimate', [ComponentController::class, 'getComponentEstimate']);
+Route::get('/components/{id}/estimate', [ComponentController::class, 'getComponentEstimate']);
 Route::apiResource('components', ComponentController::class);
 
 // ── Quotations ───────────────────────────────────────────────────────────────

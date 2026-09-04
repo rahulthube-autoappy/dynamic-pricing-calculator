@@ -32,6 +32,32 @@ class ComponentController extends Controller
         return ComponentResource::collection($this->service->getBundles());
     }
 
+    /** GET /api/components/groups — depth-1 component modules */
+    public function groups()
+    {
+        Log::info("Component: Fetching depth-1 component modules");
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getGroups(),
+        ]);
+    }
+
+    /** GET /api/components/subcomponents — all depth-2 subcomponents (leaves + sub-groups) */
+    public function subcomponents()
+    {
+        Log::info("Component: Fetching subcomponents list");
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getSubcomponents(),
+        ]);
+    }
+
+    /** GET /api/components/leaves — backwards compatible alias for subcomponents */
+    public function leaves()
+    {
+        return $this->subcomponents();
+    }
+
     /** GET /api/components/{id} — single component with full tree */
     public function show($id)
     {
@@ -69,17 +95,25 @@ class ComponentController extends Controller
     }
 
     /**
-     * GET /api/components/bundle/{id}/estimate
-     * Returns the bundle tree with estimated pricing from the component library.
+     * GET /api/components/{id}/estimate or GET /api/components/bundle/{id}/estimate
+     * Returns the complete tree with estimated pricing for any bundle, group, or leaf.
      */
-    public function getBundleEstimate($id)
+    public function getComponentEstimate($id)
     {
-        Log::info("Component: Fetching bundle estimate tree", ['bundle_id' => $id]);
-        $treeData = $this->service->getBundleTree($id);
+        Log::info("Component: Fetching component estimate tree", ['component_id' => $id]);
+        $treeData = $this->service->getComponentTree($id);
 
         return response()->json([
             'success' => true,
             'data'    => $treeData,
         ]);
+    }
+
+    /**
+     * Backwards compatibility alias for getComponentEstimate
+     */
+    public function getBundleEstimate($id)
+    {
+        return $this->getComponentEstimate($id);
     }
 }
