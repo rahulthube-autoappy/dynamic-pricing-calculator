@@ -74,19 +74,11 @@ class QuotationNodePricingEngine
             $nodeArray['children'] = $formattedChildren;
         }
 
-        if ($node->expert_fee_mode && $node->automation_expert_fee > 0) {
-            $expertFee = 0.0;
-            if ($node->depth === 0 && $node->expert_fee_mode === 'AUTOMATION_LEVEL') {
-                $expertFee = (float) $node->automation_expert_fee;
-            } elseif ($node->depth === 1 && $node->expert_fee_mode === 'COMPONENT_LEVEL') {
-                $expertFee = (float) $node->automation_expert_fee;
-            }
-
-            if ($expertFee > 0) {
-                $summary['expert_fee_total'] += $expertFee;
-                $nodeArray['expert_fee'] = round($expertFee, 2);
-                $nodeArray['calculated_price'] = round(($nodeArray['calculated_price'] ?? 0) + $expertFee, 2);
-            }
+        if ($node->depth === 1 && $node->expert_fee_mode === 'COMPONENT_LEVEL' && $node->automation_expert_fee > 0) {
+            $expertFee = (float) $node->automation_expert_fee;
+            $summary['expert_fee_total'] += $expertFee;
+            $nodeArray['expert_fee'] = round($expertFee, 2);
+            $nodeArray['calculated_price'] = round(($nodeArray['calculated_price'] ?? 0) + $expertFee, 2);
         }
 
         return $nodeArray;

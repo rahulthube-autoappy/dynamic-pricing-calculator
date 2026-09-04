@@ -19,7 +19,8 @@ class OrderRepository
         return Order::with([
             'plan',
             'quotation',
-            'pricingSnapshots' => fn($q) => $q->whereNull('parent_snapshot_id')->orderBy('depth'),
+            'pricingSnapshots' => fn($q) => $q->whereNull('parent_snapshot_id')
+                ->with(['children' => fn($c) => $c->orderBy('depth')]),
         ])->findOrFail($id);
     }
 

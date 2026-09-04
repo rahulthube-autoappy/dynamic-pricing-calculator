@@ -60,7 +60,7 @@ class ComponentService
             $parentBundle = $parentBundleId ? $bundlesMap->get($parentBundleId) : null;
             $estimatedPrice = $group->calculateEstimatedPrice($allProviders);
 
-            $result[] = [
+            $data = [
                 'id'                    => $group->id,
                 'parent_id'             => $group->parent_id,
                 'bundle_id'             => $parentBundleId,
@@ -73,23 +73,30 @@ class ComponentService
                 'platform'              => $group->platform ?? ($parentBundle ? $parentBundle->platform : null),
                 'category'              => $group->category ?? ($parentBundle ? $parentBundle->category : null),
                 'pricing_category'      => $group->pricingCategory ? [
-                    'id'          => $group->pricingCategory->id,
-                    'name'        => $group->pricingCategory->name,
-                    'code'        => $group->pricingCategory->code,
-                    'description' => $group->pricingCategory->description,
+                    'id'   => $group->pricingCategory->id,
+                    'name' => $group->pricingCategory->name,
+                    'code' => $group->pricingCategory->code,
                 ] : null,
-                'pricing_category_id'   => $group->pricing_category_id,
                 'estimated_price'       => $estimatedPrice,
-                'starting_price'        => $estimatedPrice,
-                'expert_fee_mode'       => $group->expert_fee_mode,
-                'automation_expert_fee' => $group->automation_expert_fee !== null ? (float) $group->automation_expert_fee : 0.0,
                 'child_count'           => $group->children ? $group->children->count() : 0,
-                'tags'                  => $group->tags,
-                'metadata'              => $group->metadata,
-                'notes'                 => $group->notes,
-                'sort_order'            => (int) ($group->sort_order ?? 0),
-                'is_active'             => (bool) $group->is_active,
             ];
+
+            if ($group->expert_fee_mode) {
+                $data['expert_fee_mode']       = $group->expert_fee_mode;
+                $data['automation_expert_fee'] = (float) ($group->automation_expert_fee ?? 0);
+            }
+
+            if ($group->metadata) {
+                $data['metadata'] = $group->metadata;
+            }
+            if ($group->tags) {
+                $data['tags'] = $group->tags;
+            }
+
+            $data['sort_order'] = (int) ($group->sort_order ?? 0);
+            $data['is_active']  = (bool) $group->is_active;
+
+            $result[] = $data;
         }
 
         return $result;

@@ -81,9 +81,9 @@ class Component extends Model
         }
 
         // Add automation-level expert fee if root bundle
-        if ($this->is_bundle && $this->expert_fee_mode === 'AUTOMATION_LEVEL') {
-            $total += (float) ($this->automation_expert_fee ?? 0);
-        }
+        // if ($this->is_bundle && $this->expert_fee_mode === 'AUTOMATION_LEVEL') {
+        //     $total += (float) ($this->automation_expert_fee ?? 0);
+        // }
 
         return round($total, 2);
     }

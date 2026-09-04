@@ -36,8 +36,13 @@ class PricingSnapshot extends Model
         return $this->belongsTo(PricingSnapshot::class, 'parent_snapshot_id');
     }
 
-    public function childrenSnapshots()
+    public function children()
     {
         return $this->hasMany(PricingSnapshot::class, 'parent_snapshot_id');
+    }
+
+    public function childrenSnapshots()
+    {
+        return $this->children();
     }
 }
