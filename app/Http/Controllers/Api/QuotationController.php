@@ -23,8 +23,18 @@ class QuotationController extends Controller
     public function index(Request $request)
     {
         $userId = $request->input('user_id', 1);
-        Log::info("Quotation: Listing quotations for user", ['user_id' => $userId]);
-        return QuotationResource::collection($this->service->getByUser((int) $userId));
+        $status = $request->input('status');
+        $includeArchived = $request->boolean('include_archived', false);
+
+        Log::info("Quotation: Listing quotations for user", [
+            'user_id'          => $userId,
+            'status'           => $status,
+            'include_archived' => $includeArchived,
+        ]);
+
+        return QuotationResource::collection(
+            $this->service->getByUser((int) $userId, $status, $includeArchived)
+        );
     }
 
     /** GET /api/quotations/{id} */

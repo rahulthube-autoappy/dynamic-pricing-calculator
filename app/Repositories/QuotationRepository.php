@@ -7,12 +7,18 @@ use App\Models\QuotationNode;
 
 class QuotationRepository
 {
-    public function getByUser(int $userId)
+    public function getByUser(int $userId, ?string $status = null, bool $includeArchived = false)
     {
-        return Quotation::with(['selectedPlan', 'sourceComponent'])
-            ->where('user_id', $userId)
-            ->orderByDesc('updated_at')
-            ->get();
+        $query = Quotation::with(['selectedPlan', 'sourceComponent'])
+            ->where('user_id', $userId);
+
+        if ($status) {
+            $query->where('status', $status);
+        } elseif (!$includeArchived) {
+            $query->where('status', '!=', 'archived');
+        }
+
+        return $query->orderByDesc('updated_at')->get();
     }
 
     public function getById(string $id): Quotation

@@ -34,9 +34,9 @@ class QuotationService
         $this->providerRepo = $providerRepo;
     }
 
-    public function getByUser(int $userId)
+    public function getByUser(int $userId, ?string $status = null, bool $includeArchived = false)
     {
-        return $this->repo->getByUser($userId);
+        return $this->repo->getByUser($userId, $status, $includeArchived);
     }
 
     public function getById(string $id): Quotation
