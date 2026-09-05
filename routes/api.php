@@ -30,11 +30,15 @@ Route::get('/components/{id}/estimate', [ComponentController::class, 'getCompone
 Route::apiResource('components', ComponentController::class);
 
 // ── Quotations ───────────────────────────────────────────────────────────────
+Route::get('/quotations/{id}/estimate', [QuotationController::class, 'estimate']);
+Route::get('/quotations/{id}/tree', [QuotationController::class, 'estimate']);
 Route::post('/quotations/{id}/calculate', [QuotationController::class, 'calculate']);
 Route::apiResource('quotations', QuotationController::class);
 
 // ── Quotation Nodes (nested under quotations) ────────────────────────────────
 Route::prefix('quotations/{quotationId}/nodes')->group(function () {
+    Route::get('/estimate', [QuotationNodeController::class, 'estimate']);
+    Route::get('/tree', [QuotationNodeController::class, 'estimate']);
     Route::get('/', [QuotationNodeController::class, 'index']);
     Route::post('/', [QuotationNodeController::class, 'store']);
     Route::put('/{nodeId}', [QuotationNodeController::class, 'update']);

@@ -87,4 +87,19 @@ class QuotationController extends Controller
             'data'    => $pricing,
         ]);
     }
+
+    /**
+     * GET /api/quotations/{id}/estimate
+     * Returns the full quotation nodes tree with calculated/estimated prices, providers, and cycle metadata.
+     */
+    public function estimate($id)
+    {
+        Log::info("Quotation: Fetching quotation estimate tree", ['quotation_id' => $id]);
+        $tree = $this->service->getQuotationTree((string) $id);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $tree,
+        ]);
+    }
 }

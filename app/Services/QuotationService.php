@@ -7,6 +7,9 @@ use App\Models\QuotationNode;
 use App\Repositories\QuotationRepository;
 use App\Repositories\QuotationNodeRepository;
 use App\Repositories\ComponentRepository;
+use App\Repositories\ProviderRepository;
+use App\Models\Component;
+use App\Models\Provider;
 use Illuminate\Support\Facades\DB;
 
 class QuotationService
@@ -15,17 +18,20 @@ class QuotationService
     protected QuotationNodeRepository $nodeRepo;
     protected ComponentRepository $componentRepo;
     protected QuotationNodePricingEngine $pricingEngine;
+    protected ProviderRepository $providerRepo;
 
     public function __construct(
         QuotationRepository $repo,
         QuotationNodeRepository $nodeRepo,
         ComponentRepository $componentRepo,
-        QuotationNodePricingEngine $pricingEngine
+        QuotationNodePricingEngine $pricingEngine,
+        ProviderRepository $providerRepo
     ) {
         $this->repo = $repo;
         $this->nodeRepo = $nodeRepo;
         $this->componentRepo = $componentRepo;
         $this->pricingEngine = $pricingEngine;
+        $this->providerRepo = $providerRepo;
     }
 
     public function getByUser(int $userId)
@@ -141,5 +147,193 @@ class QuotationService
                 $this->copyComponentTreeToNodes($child, $quotationId, $node->id, $depth + 1);
             }
         }
+    }
+
+    public function getQuotationTree(string $quotationId): array
+    {
+        $quotation = $this->repo->getById($quotationId);
+
+        $allNodes = QuotationNode::with(['selectedProvider', 'pricingCategory'])
+            ->where('quotation_id', $quotationId)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($allNodes as $item) {
+            $children = $allNodes->filter(fn($c) => $c->parent_node_id === $item->id)->values();
+            $item->setRelation('children', $children);
+        }
+
+        $allComponents = Component::all()->keyBy('id');
+        $allProviders = $this->providerRepo->getAllActiveKeyedById();
+
+        $rootNodes = $allNodes->whereNull('parent_node_id')->values();
+
+        $formattedRoots = [];
+        foreach ($rootNodes as $root) {
+            $formattedRoots[] = $this->formatQuotationNode($root, $allProviders, $allComponents);
+        }
+
+        return count($formattedRoots) === 1 ? $formattedRoots[0] : $formattedRoots;
+    }
+
+    protected function formatQuotationNode(QuotationNode $node, $allProviders, $allComponents): array
+    {
+        $hasChildren = $node->relationLoaded('children') && $node->children && $node->children->count() > 0;
+        $sourceComp = $node->source_component_id ? $allComponents->get($node->source_component_id) : null;
+
+        $data = [
+            'id'                  => $node->id,
+            'quotation_id'        => $node->quotation_id,
+            'parent_node_id'      => $node->parent_node_id,
+            'source_component_id' => $node->source_component_id,
+            'name'                => $node->name,
+            'description'         => $node->description ?? ($sourceComp ? $sourceComp->description : null),
+            'depth'               => (int) $node->depth,
+            'is_custom'           => (bool) $node->is_custom,
+            'is_selected'         => (bool) $node->is_selected,
+            'pricing_category'    => $node->pricingCategory ? [
+                'id'   => $node->pricingCategory->id,
+                'name' => $node->pricingCategory->name,
+                'code' => $node->pricingCategory->code,
+            ] : null,
+        ];
+
+        if (!$hasChildren) {
+            $price = $this->computeQuotationLeafPrice($node, $allProviders);
+            $data['estimated_price'] = $node->is_selected ? round($price, 2) : 0.0;
+            $data['pricing_method']  = $node->pricing_method ?? ($sourceComp ? $sourceComp->pricing_method : null);
+            $data['billing_type']    = $node->billing_type ?? ($sourceComp ? $sourceComp->billing_type : null);
+            $data['unit']            = $node->unit ?? ($sourceComp ? $sourceComp->unit : null);
+            $data['unit_price']      = $node->unit_price !== null ? (float) $node->unit_price : ($sourceComp ? (float) $sourceComp->unit_price : null);
+            $data['quantity']        = $node->quantity !== null ? (float) $node->quantity : 1;
+            $data['selected_dimensions'] = $node->selected_dimensions;
+
+            $expandedProviders = [];
+            $defaultProvider = null;
+            $availProviders = $sourceComp ? $sourceComp->available_providers : null;
+
+            if ($availProviders && is_array($availProviders)) {
+                foreach ($availProviders as $p) {
+                    $provider = $allProviders->get($p['provider_id'] ?? null);
+                    if ($provider) {
+                        $isDefault = (bool) ($p['is_default'] ?? false);
+                        $isSelected = ($node->selected_provider_id === $provider->id) || (!$node->selected_provider_id && $isDefault);
+                        $providerData = [
+                            'provider_id'         => $provider->id,
+                            'provider_key'        => $provider->provider_company_code,
+                            'provider_name'       => $provider->provider_company,
+                            'model_id'            => $provider->code,
+                            'model_name'          => $provider->name,
+                            'billing_unit'        => $provider->billing_unit,
+                            'billing_granularity' => (int) ($provider->billing_granularity ?? 1),
+                            'effective_rate'      => (float) $provider->effective_rate,
+                            'input_rate'          => $provider->input_rate !== null ? (float) $provider->input_rate : null,
+                            'output_rate'         => $provider->output_rate !== null ? (float) $provider->output_rate : null,
+                            'multipliers'         => $provider->multipliers ?? (object) [],
+                            'is_default'          => $isDefault,
+                            'is_selected'         => $isSelected,
+                        ];
+                        $expandedProviders[] = $providerData;
+
+                        if ($isDefault || $defaultProvider === null) {
+                            $defaultProvider = $providerData;
+                        }
+                    }
+                }
+            } elseif ($node->selectedProvider) {
+                $p = $node->selectedProvider;
+                $selectedData = [
+                    'provider_id'         => $p->id,
+                    'provider_key'        => $p->provider_company_code,
+                    'provider_name'       => $p->provider_company,
+                    'model_id'            => $p->code,
+                    'model_name'          => $p->name,
+                    'billing_unit'        => $p->billing_unit,
+                    'billing_granularity' => (int) ($p->billing_granularity ?? 1),
+                    'effective_rate'      => (float) $p->effective_rate,
+                    'input_rate'          => $p->input_rate !== null ? (float) $p->input_rate : null,
+                    'output_rate'         => $p->output_rate !== null ? (float) $p->output_rate : null,
+                    'multipliers'         => $p->multipliers ?? (object) [],
+                    'is_default'          => true,
+                    'is_selected'         => true,
+                ];
+                $expandedProviders[] = $selectedData;
+                $defaultProvider = $selectedData;
+            }
+
+            $data['providers']        = $expandedProviders;
+            $data['default_provider'] = $defaultProvider;
+            $data['selected_provider'] = $node->selected_provider_id 
+                ? (collect($expandedProviders)->firstWhere('provider_id', $node->selected_provider_id) ?? $defaultProvider)
+                : $defaultProvider;
+        } else {
+            $children = [];
+            $childSum = 0.0;
+            foreach ($node->children as $child) {
+                $formattedChild = $this->formatQuotationNode($child, $allProviders, $allComponents);
+                $childSum += $formattedChild['estimated_price'] ?? 0;
+                $children[] = $formattedChild;
+            }
+
+            $expertFee = 0.0;
+            if ($node->depth === 1 && $node->expert_fee_mode === 'COMPONENT_LEVEL' && $node->automation_expert_fee > 0) {
+                $expertFee = (float) $node->automation_expert_fee;
+            }
+
+            $data['estimated_price'] = $node->is_selected ? round($childSum + $expertFee, 2) : 0.0;
+
+            if ($node->expert_fee_mode || ($sourceComp && $sourceComp->expert_fee_mode)) {
+                $data['expert_fee_mode']       = $node->expert_fee_mode ?? $sourceComp->expert_fee_mode;
+                $data['automation_expert_fee'] = (float) ($node->automation_expert_fee ?? ($sourceComp ? $sourceComp->automation_expert_fee : 0));
+            }
+
+            $data['children'] = $children;
+        }
+
+        $meta = $node->metadata ?? ($sourceComp ? $sourceComp->metadata : null);
+        if ($meta) {
+            $data['metadata'] = $meta;
+        }
+
+        $data['sort_order'] = (int) ($node->sort_order ?? ($sourceComp ? $sourceComp->sort_order : 0));
+
+        return $data;
+    }
+
+    protected function computeQuotationLeafPrice(QuotationNode $node, $allProviders): float
+    {
+        $quantity = (float) ($node->quantity ?? 1);
+        $unitPrice = null;
+
+        if ($node->unit_price !== null) {
+            $unitPrice = (float) $node->unit_price;
+        }
+
+        $provider = $node->selected_provider_id ? $allProviders->get($node->selected_provider_id) : null;
+        if ($unitPrice === null && $provider) {
+            $unitPrice = $provider->effective_rate * $this->getDimensionMultiplier($provider, $node->selected_dimensions);
+        }
+
+        if ($unitPrice === null) {
+            return 0.0;
+        }
+
+        $granularity = $provider?->billing_granularity ?? 1;
+        return ($quantity / max($granularity, 1)) * $unitPrice;
+    }
+
+    protected function getDimensionMultiplier($provider, ?array $dimensions): float
+    {
+        if (!$dimensions || !$provider->multipliers) {
+            return 1.0;
+        }
+        $multipliers = is_array($provider->multipliers) ? $provider->multipliers : json_decode($provider->multipliers, true);
+        $result = 1.0;
+        foreach ($dimensions as $key => $value) {
+            if (isset($multipliers[$key][$value])) {
+                $result *= (float) $multipliers[$key][$value];
+            }
+        }
+        return $result;
     }
 }

@@ -72,4 +72,16 @@ class QuotationNodeController extends Controller
         $node = $this->service->toggleSelection((string) $nodeId);
         return new QuotationNodeResource($node);
     }
+
+    /** GET /api/quotations/{quotationId}/nodes/estimate */
+    public function estimate($quotationId)
+    {
+        Log::info("QuotationNode: Fetching quotation nodes estimate tree", ['quotation_id' => $quotationId]);
+        $tree = app(\App\Services\QuotationService::class)->getQuotationTree((string) $quotationId);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $tree,
+        ]);
+    }
 }
