@@ -34,14 +34,127 @@ class QuotationService
         $this->providerRepo = $providerRepo;
     }
 
-    public function getByUser(int $userId, ?string $status = null, bool $includeArchived = false)
+    public function getByUser(int $userId, ?string $status = null, bool $includeArchived = false): array
     {
-        return $this->repo->getByUser($userId, $status, $includeArchived);
+        $quotations = $this->repo->getByUser($userId, $status, $includeArchived);
+
+        if ($quotations->isEmpty()) {
+            return [];
+        }
+
+        $quotationIds = $quotations->pluck('id')->all();
+
+        $allNodes = QuotationNode::with(['selectedProvider', 'pricingCategory'])
+            ->whereIn('quotation_id', $quotationIds)
+            ->orderBy('sort_order')
+            ->get();
+
+        $allComponents = Component::all()->keyBy('id');
+        $allProviders = $this->providerRepo->getAllActiveKeyedById();
+
+        $nodesByQuote = $allNodes->groupBy('quotation_id');
+
+        $result = [];
+        foreach ($quotations as $quotation) {
+            $quoteNodes = $nodesByQuote->get($quotation->id, collect());
+
+            foreach ($quoteNodes as $item) {
+                $children = $quoteNodes->filter(fn($c) => $c->parent_node_id === $item->id)->values();
+                $item->setRelation('children', $children);
+            }
+
+            $rootNodes = $quoteNodes->whereNull('parent_node_id')->values();
+            $formattedRoots = [];
+            $totalEstimate = 0.0;
+
+            foreach ($rootNodes as $root) {
+                $formatted = $this->formatQuotationNode($root, $allProviders, $allComponents);
+                $totalEstimate += (float) ($formatted['estimated_price'] ?? 0);
+                $formattedRoots[] = $formatted;
+            }
+
+            $result[] = [
+                'id'               => $quotation->id,
+                'user_id'          => $quotation->user_id,
+                'type'             => $quotation->type,
+                'title'            => $quotation->title,
+                'status'           => $quotation->status,
+                'requires_expert'  => (bool) $quotation->requires_expert,
+                'expert_notes'     => $quotation->expert_notes,
+                'notes'            => $quotation->notes,
+                'idempotency_key'  => $quotation->idempotency_key,
+                'estimated_price'  => round($totalEstimate, 2),
+                'selected_plan'    => $quotation->selectedPlan ? [
+                    'id'    => $quotation->selectedPlan->id,
+                    'name'  => $quotation->selectedPlan->name,
+                    'code'  => $quotation->selectedPlan->code,
+                    'price' => (float) $quotation->selectedPlan->price,
+                ] : null,
+                'source_component' => $quotation->sourceComponent ? [
+                    'id'   => $quotation->sourceComponent->id,
+                    'name' => $quotation->sourceComponent->name,
+                ] : null,
+                'nodes'            => $formattedRoots,
+                'created_at'       => $quotation->created_at,
+                'updated_at'       => $quotation->updated_at,
+            ];
+        }
+
+        return $result;
     }
 
-    public function getById(string $id): Quotation
+    public function getById(string $id): array
     {
-        return $this->repo->getById($id);
+        $quotation = $this->repo->getById($id);
+
+        $allNodes = QuotationNode::with(['selectedProvider', 'pricingCategory'])
+            ->where('quotation_id', $id)
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($allNodes as $item) {
+            $children = $allNodes->filter(fn($c) => $c->parent_node_id === $item->id)->values();
+            $item->setRelation('children', $children);
+        }
+
+        $allComponents = Component::all()->keyBy('id');
+        $allProviders = $this->providerRepo->getAllActiveKeyedById();
+
+        $rootNodes = $allNodes->whereNull('parent_node_id')->values();
+
+        $formattedRoots = [];
+        $totalEstimate = 0.0;
+        foreach ($rootNodes as $root) {
+            $formatted = $this->formatQuotationNode($root, $allProviders, $allComponents);
+            $totalEstimate += (float) ($formatted['estimated_price'] ?? 0);
+            $formattedRoots[] = $formatted;
+        }
+
+        return [
+            'id'               => $quotation->id,
+            'user_id'          => $quotation->user_id,
+            'type'             => $quotation->type,
+            'title'            => $quotation->title,
+            'status'           => $quotation->status,
+            'requires_expert'  => (bool) $quotation->requires_expert,
+            'expert_notes'     => $quotation->expert_notes,
+            'notes'            => $quotation->notes,
+            'idempotency_key'  => $quotation->idempotency_key,
+            'estimated_price'  => round($totalEstimate, 2),
+            'selected_plan'    => $quotation->selectedPlan ? [
+                'id'    => $quotation->selectedPlan->id,
+                'name'  => $quotation->selectedPlan->name,
+                'code'  => $quotation->selectedPlan->code,
+                'price' => (float) $quotation->selectedPlan->price,
+            ] : null,
+            'source_component' => $quotation->sourceComponent ? [
+                'id'   => $quotation->sourceComponent->id,
+                'name' => $quotation->sourceComponent->name,
+            ] : null,
+            'nodes'            => $formattedRoots,
+            'created_at'       => $quotation->created_at,
+            'updated_at'       => $quotation->updated_at,
+        ];
     }
 
     public function create(array $data): Quotation
@@ -179,13 +292,15 @@ class QuotationService
     protected function formatQuotationNode(QuotationNode $node, $allProviders, $allComponents): array
     {
         $hasChildren = $node->relationLoaded('children') && $node->children && $node->children->count() > 0;
-        $sourceComp = $node->source_component_id ? $allComponents->get($node->source_component_id) : null;
+        $sourceComp = $node->source_component_id 
+            ? $allComponents->get($node->source_component_id) 
+            : $allComponents->firstWhere('name', $node->name);
 
         $data = [
             'id'                  => $node->id,
             'quotation_id'        => $node->quotation_id,
             'parent_node_id'      => $node->parent_node_id,
-            'source_component_id' => $node->source_component_id,
+            'source_component_id' => $node->source_component_id ?? ($sourceComp ? $sourceComp->id : null),
             'name'                => $node->name,
             'description'         => $node->description ?? ($sourceComp ? $sourceComp->description : null),
             'depth'               => (int) $node->depth,
@@ -195,12 +310,23 @@ class QuotationService
                 'id'   => $node->pricingCategory->id,
                 'name' => $node->pricingCategory->name,
                 'code' => $node->pricingCategory->code,
-            ] : null,
+            ] : ($sourceComp && $sourceComp->pricingCategory ? [
+                'id'   => $sourceComp->pricingCategory->id,
+                'name' => $sourceComp->pricingCategory->name,
+                'code' => $sourceComp->pricingCategory->code,
+            ] : null),
         ];
+
+        $expertFee = 0.0;
+        $feeMode = $node->expert_fee_mode ?? ($sourceComp ? $sourceComp->expert_fee_mode : null);
+        $feeAmt = (float) ($node->automation_expert_fee ?? ($sourceComp ? $sourceComp->automation_expert_fee : 0));
+        if ($node->depth === 1 && $feeMode === 'COMPONENT_LEVEL' && $feeAmt > 0) {
+            $expertFee = $feeAmt;
+        }
 
         if (!$hasChildren) {
             $price = $this->computeQuotationLeafPrice($node, $allProviders);
-            $data['estimated_price'] = $node->is_selected ? round($price, 2) : 0.0;
+            $data['estimated_price'] = $node->is_selected ? round($price + $expertFee, 2) : 0.0;
             $data['pricing_method']  = $node->pricing_method ?? ($sourceComp ? $sourceComp->pricing_method : null);
             $data['billing_type']    = $node->billing_type ?? ($sourceComp ? $sourceComp->billing_type : null);
             $data['unit']            = $node->unit ?? ($sourceComp ? $sourceComp->unit : null);
@@ -275,19 +401,13 @@ class QuotationService
                 $children[] = $formattedChild;
             }
 
-            $expertFee = 0.0;
-            if ($node->depth === 1 && $node->expert_fee_mode === 'COMPONENT_LEVEL' && $node->automation_expert_fee > 0) {
-                $expertFee = (float) $node->automation_expert_fee;
-            }
-
             $data['estimated_price'] = $node->is_selected ? round($childSum + $expertFee, 2) : 0.0;
-
-            if ($node->expert_fee_mode || ($sourceComp && $sourceComp->expert_fee_mode)) {
-                $data['expert_fee_mode']       = $node->expert_fee_mode ?? $sourceComp->expert_fee_mode;
-                $data['automation_expert_fee'] = (float) ($node->automation_expert_fee ?? ($sourceComp ? $sourceComp->automation_expert_fee : 0));
-            }
-
             $data['children'] = $children;
+        }
+
+        if ($feeMode) {
+            $data['expert_fee_mode']       = $feeMode;
+            $data['automation_expert_fee'] = $feeAmt;
         }
 
         $meta = $node->metadata ?? ($sourceComp ? $sourceComp->metadata : null);

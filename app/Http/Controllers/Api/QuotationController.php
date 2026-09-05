@@ -19,7 +19,7 @@ class QuotationController extends Controller
         $this->service = $service;
     }
 
-    /** GET /api/quotations — list all quotations for the user */
+    /** GET /api/quotations — list all quotations for the user with full nodes tree */
     public function index(Request $request)
     {
         $userId = $request->input('user_id', 1);
@@ -32,16 +32,20 @@ class QuotationController extends Controller
             'include_archived' => $includeArchived,
         ]);
 
-        return QuotationResource::collection(
-            $this->service->getByUser((int) $userId, $status, $includeArchived)
-        );
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getByUser((int) $userId, $status, $includeArchived),
+        ]);
     }
 
     /** GET /api/quotations/{id} */
     public function show($id)
     {
         Log::info("Quotation: Fetching quotation details", ['quotation_id' => $id]);
-        return new QuotationResource($this->service->getById((string) $id));
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getById((string) $id),
+        ]);
     }
 
     /** POST /api/quotations */
@@ -58,7 +62,10 @@ class QuotationController extends Controller
         ]);
         $quotation = $this->service->create($data);
         Log::info("Quotation: Created quotation successfully", ['quotation_id' => $quotation->id]);
-        return (new QuotationResource($quotation))->response()->setStatusCode(201);
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getById($quotation->id),
+        ], 201);
     }
 
     /** PUT|PATCH /api/quotations/{id} */
@@ -68,7 +75,11 @@ class QuotationController extends Controller
             'quotation_id' => $id,
             'fields'       => array_keys($request->validated()),
         ]);
-        return new QuotationResource($this->service->update((string) $id, $request->validated()));
+        $this->service->update((string) $id, $request->validated());
+        return response()->json([
+            'success' => true,
+            'data'    => $this->service->getById((string) $id),
+        ]);
     }
 
     /** DELETE /api/quotations/{id} — archives the quotation */
